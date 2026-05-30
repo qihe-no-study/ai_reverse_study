@@ -1,0 +1,437 @@
+{
+  "version": "1.0.0",
+  "kind": "codebase",
+  "project": {
+    "name": "QQ音乐逆向工程 - 歌曲/歌词/评论API对接",
+    "languages": ["Python", "JavaScript", "Node.js"],
+    "frameworks": ["requests", "JSVMP", "AES-128-GCM"],
+    "description": "逆向QQ音乐Web端(y.qq.com)签名算法，完成歌曲下载、歌词获取、评论采集。核心难点：JSVMP虚拟机保护的sign算法、AES-GCM加密通道、双版本vkey API鉴权差异、Cookie自动刷新。复杂度：L3(多层壳+环境依赖)",
+    "analyzedAt": "2026-05-30T07:00:00.000Z",
+    "gitCommitHash": "local"
+  },
+  "nodes": [
+    {
+      "id": "main.py",
+      "type": "file",
+      "name": "main.py - Python调度脚本",
+      "filePath": "job/main.py",
+      "lineRange": [1, 317],
+      "summary": "Python统一调度入口。通过subprocess调用Node.js sign生成器获取签名，使用requests库发送plaintext通道HTTP请求，完成歌词(base64 LRC)、评论(翻页采集)、歌曲(M500品质MP3)三种数据的获取与本地保存。内置重试机制(3次，间隔3s/6s/9s)。",
+      "tags": ["python", "dispatcher", "orchestrator", "requests"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "sign_server.js",
+      "type": "file",
+      "name": "sign_server.js - Node.js签名CLI",
+      "filePath": "job/sign_server.js",
+      "lineRange": [1, 23],
+      "summary": "Node.js CLI桥接器，接收明文JSON body字符串(通过--sign参数或stdin)，调用getSecuritySign()生成sign值并输出到stdout。作为Python与JSVMP之间的通信桥梁，subprocess通信开销<200ms。",
+      "tags": ["nodejs", "cli", "bridge", "sign"],
+      "complexity": "simple"
+    },
+    {
+      "id": "sign.js",
+      "type": "file",
+      "name": "sign.js - JSVMP签名模块",
+      "filePath": "job/sign.js",
+      "lineRange": [1, 543],
+      "summary": "从vendor.chunk.js(offset:38639)提取的JSVMP虚拟机解释器。内部实现__sign_hash_20200305(MD5变种)。暴露getSecuritySign()函数，输入明文JSON body字符串，输出'zzb'+40字符hex/alpha混合哈希(Node.js环境前缀zzb，浏览器zzc，服务端均接受)。包含完整环境补丁：独立n对象作用域、navigator.userAgent伪装、location.host绑定。",
+      "tags": ["jsvmp", "vm", "md5", "sign", "obfuscated"],
+      "complexity": "complex"
+    },
+    {
+      "id": "crypto.js",
+      "type": "file",
+      "name": "crypto.js - AES-GCM加密模块",
+      "filePath": "job/crypto.js",
+      "lineRange": [1, 100],
+      "summary": "AES-128-GCM加密通道实现(encoding=ag-1)。密钥bd305f10d0ff74b6ef54dab835b5e1cf(16字节hex)。实现cgiEncrypt(请求加密：JSON→AES-GCM encrypt→base64)和cgiDecrypt(响应解密：不是标准AES-GCM，而是JSVMP自定义同步密码__cgiDecrypt)。目前作为备选方案，明文通道+CgiGetVkey已能满足需求。",
+      "tags": ["aes-gcm", "encryption", "crypto", "jsvmp", "backup"],
+      "complexity": "complex"
+    },
+    {
+      "id": "jsvmp2_raw.js",
+      "type": "file",
+      "name": "jsvmp2_raw.js - 第二段JSVMP字节码",
+      "filePath": "job/jsvmp2_raw.js",
+      "lineRange": [1, 100],
+      "summary": "crypto.js的JSVMP依赖模块，包含__cgiDecrypt自定义同步密码算法的虚拟机字节码。与sign.js的VM结构类似但字节码不同，服务不同的保护目标(解密vs签名)。",
+      "tags": ["jsvmp", "bytecode", "decrypt", "crypto"],
+      "complexity": "complex"
+    },
+    {
+      "id": "sign_function",
+      "type": "function",
+      "name": "getSecuritySign(body)",
+      "filePath": "job/sign.js",
+      "summary": "JSVMP保护的签名生成函数。内部MD5变种(SHA-1初始常量[1732584193, 4023233417, 2562383102, 3285377520])。输入明文JSON字符串，输出'zzb'+40字符哈希。Node.js环境下前缀为zzb，浏览器为zzc。",
+      "tags": ["sign", "md5", "jsvmp", "core"],
+      "complexity": "complex",
+      "lineRange": [400, 540]
+    },
+    {
+      "id": "hash5381",
+      "type": "function",
+      "name": "hash5381(skey) → g_tk",
+      "filePath": "job/main.py",
+      "summary": "腾讯通用g_tk生成算法。对qqmusic_key执行DJB hash5381：(h<<5)+h+ord(c)，结果&0x7FFFFFFF。g_tk必须和当前使用的musickey配对计算，更换cookie后必须重新计算。",
+      "tags": ["gtk", "hash", "authentication"],
+      "complexity": "simple",
+      "lineRange": [50, 56]
+    },
+    {
+      "id": "api_request",
+      "type": "function",
+      "name": "api_request(req_data, retries)",
+      "filePath": "job/main.py",
+      "summary": "核心API请求函数。构建payload(comm公共参数+业务req_N)，JSON序列化后调用get_sign()获取签名，POST到u6.y.qq.com/cgi-bin/musics.fcg。使用plaintext通道(非加密)，支持自动重试。",
+      "tags": ["api", "post", "sign", "retry"],
+      "complexity": "moderate",
+      "lineRange": [81, 101]
+    },
+    {
+      "id": "get_lyric",
+      "type": "function",
+      "name": "get_lyric() → LRC歌词",
+      "filePath": "job/main.py",
+      "summary": "获取歌词流程。调用music.musichallSong.PlayLyricInfo.GetPlayLyricInfo接口，响应中lyric字段为base64编码LRC格式，解码后保存为lyric.lrc。使用plaintext musics.fcg通道。",
+      "tags": ["lyric", "lrc", "base64", "api"],
+      "complexity": "simple",
+      "lineRange": [103, 129]
+    },
+    {
+      "id": "get_comments",
+      "type": "function",
+      "name": "get_comments(page_size) → 评论列表",
+      "filePath": "job/main.py",
+      "summary": "评论翻页采集流程。调用music.globalComment.CommentRead.GetNewCommentList，使用LastCommentSeqNo游标翻页。每页间隔≥1秒防止ConnectionResetError。服务端总数1243，实际可获取595条。",
+      "tags": ["comments", "pagination", "cursor", "rate-limit"],
+      "complexity": "moderate",
+      "lineRange": [132, 189]
+    },
+    {
+      "id": "get_song_url",
+      "type": "function",
+      "name": "get_song_url() → 播放URL",
+      "filePath": "job/main.py",
+      "summary": "歌曲播放URL获取。关键发现：不能使用music.vkey.GetEVkey.GetUrl(持续返回104009 invalidq)，必须使用vkey.GetVkeyServer.CgiGetVkey(经典接口，需filename参数)。filename格式：{前缀}{songmid}.{ext}，M500=MP3 128k免费。",
+      "tags": ["vkey", "song", "download", "api-selection"],
+      "complexity": "moderate",
+      "lineRange": [192, 239]
+    },
+    {
+      "id": "musics_fcg",
+      "type": "endpoint",
+      "name": "POST musics.fcg - 核心API入口",
+      "summary": "QQ音乐统一CGI接口。Query参数：_=毫秒时间戳，sign=JSVMP签名(输入为明文JSON body)，encoding=ag-1(可选，启用AES-GCM加密)。Body：紧凑JSON(separators=(',',':'))。响应：明文JSON或AES-GCM加密ArrayBuffer。",
+      "tags": ["api", "cgi", "endpoint", "sign-required"],
+      "complexity": "complex"
+    },
+    {
+      "id": "cgi_get_vkey",
+      "type": "endpoint",
+      "name": "vkey.GetVkeyServer.CgiGetVkey",
+      "summary": "经典Vkey接口，稳定可靠。需要filename参数，返回purl+SIP拼接的完整播放URL。支持C400/M500/M800/F000多种品质。与新版GetEVkey形成鲜明对比——后者即使cookie有效也返回104009。",
+      "tags": ["api", "vkey", "stable", "song-url"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "get_evkey",
+      "type": "endpoint",
+      "name": "music.vkey.GetEVkey.GetUrl (不可用)",
+      "summary": "新版Vkey接口。浏览器端走加密通道时正常工作，明文通道下持续返回104009 invalidq。已标记为不可用，使用CgiGetVkey替代。这是逆向中遇到的关键API版本差异陷阱。",
+      "tags": ["api", "vkey", "broken", "encryption-required"],
+      "complexity": "simple"
+    },
+    {
+      "id": "play_lyric",
+      "type": "endpoint",
+      "name": "music.musichallSong.PlayLyricInfo.GetPlayLyricInfo",
+      "summary": "歌词获取接口。输入songMID+songID，返回base64编码的LRC格式歌词。明文通道稳定工作，无特殊鉴权要求。",
+      "tags": ["api", "lyric", "lrc", "base64"],
+      "complexity": "simple"
+    },
+    {
+      "id": "comment_list",
+      "type": "endpoint",
+      "name": "music.globalComment.CommentRead.GetNewCommentList",
+      "summary": "最新评论列表接口。游标翻页(LastCommentSeqNo)，每页25条。BizType=1(歌曲类型)，BizId=songID。返回HasMore标志位判断翻页终止。1秒间隔防止被限流。",
+      "tags": ["api", "comments", "pagination", "cursor"],
+      "complexity": "simple"
+    },
+    {
+      "id": "qq_login",
+      "type": "endpoint",
+      "name": "QQConnectLogin.LoginServer.QQLogin (Cookie刷新)",
+      "summary": "无需浏览器登录的Cookie刷新接口。用access_token+refresh_token+openid换新musickey。access_token有效期约60天，musickey每3天过期(keyExpiresIn:259200)。g_tk固定为5381。",
+      "tags": ["api", "auth", "refresh", "oauth2"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "jsvmp_vm",
+      "type": "module",
+      "name": "JSVMP虚拟机保护",
+      "summary": "JS Virtual Machine Protection — 将原始JS代码编译为自定义字节码，由解释器在VM内执行。QQ音乐使用JSVMP保护sign算法(MD5变种)和cgi加解密算法。sign.js包含完整解释器+字节码，运行时需要访问navigator/location等浏览器API，已在sign.js中通过独立n对象补丁。",
+      "tags": ["jsvmp", "vm", "obfuscation", "bytecode", "protection"],
+      "complexity": "complex"
+    },
+    {
+      "id": "aes_gcm_channel",
+      "type": "module",
+      "name": "AES-GCM加密通道 (备用)",
+      "summary": "encoding=ag-1加密通道完整实现。请求：明文JSON→TextEncoder→SubtleCrypto.encrypt(AES-128-GCM)→base64→POST body。响应解密不走标准AES-GCM，而是JSVMP自定义__cgiDecrypt同步密码。密钥已提取：bd305f10d0ff74b6ef54dab835b5e1cf。当前方案不需要加密通道即完成所有功能。",
+      "tags": ["aes-gcm", "encryption", "crypto", "webcrypto"],
+      "complexity": "complex"
+    },
+    {
+      "id": "env_patches",
+      "type": "module",
+      "name": "JSVMP环境补丁",
+      "summary": "sign.js中为Node.js运行JSVMP所做的环境伪装。核心补丁：独立n对象(代替globalThis避免Node v24+全局navigator冲突)、navigator.userAgent=Chrome/147 UA、location.host=y.qq.com、window自引用。这些补丁是JSVMP在Node.js环境可运行的关键。",
+      "tags": ["environment", "patches", "nodejs", "compatibility"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "cookie_refresh_flow",
+      "type": "flow",
+      "name": "Cookie自动刷新流程",
+      "summary": "musickey 3天过期，access_token 60天有效。刷新流程：用access_token+refresh_token+openid+musicid调用QQLogin接口→获取新musickey→重新计算g_tk(hash5381)→替换cookie。60天内可无限次刷新，无需浏览器登录。",
+      "tags": ["cookie", "refresh", "token", "automation"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "POST u6.y.qq.com/cgi-bin/musicu.fcg",
+        "entryType": "http",
+        "entities": ["musickey", "access_token", "refresh_token", "g_tk"],
+        "businessRules": [
+          "musickey有效期3天(keyExpiresIn:259200)",
+          "access_token有效期约60天",
+          "g_tk = hash5381(qqmusic_key)，更换musickey后必须重新计算",
+          "QQLogin请求的g_tk固定为5381"
+        ]
+      }
+    },
+    {
+      "id": "sign_flow",
+      "type": "flow",
+      "name": "Sign签名生成流程",
+      "summary": "明文JSON body → Python subprocess调用 → Node.js sign_server.js --sign → JSVMP getSecuritySign() → MD5变种哈希 → 'zzb'+40字符 → stdout → Python接收。完整链路：Python→Node.js→JSVMP→MD5→sign字符串。",
+      "tags": ["sign", "pipeline", "cross-process", "jsvmp", "md5"],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "get_sign() in main.py",
+        "entryType": "cli",
+        "entities": ["body JSON", "sign字符串", "__sign_hash_20200305"],
+        "businessRules": [
+          "输入为明文body JSON字符串(未加密)",
+          "sign前缀：Node.js环境=zzb，浏览器=zzc",
+          "JSVMP内部使用修改过的SHA-1初始常量",
+          "子进程通信开销<200ms"
+        ]
+      }
+    },
+    {
+      "id": "song_download_flow",
+      "type": "flow",
+      "name": "歌曲下载完整流程",
+      "summary": "1.构建CgiGetVkey请求(含filename=M500{songmid}.mp3) → 2.生成sign → 3.POST musics.fcg → 4.解析响应获取purl+sip → 5.拼接完整URL → 6.HTTP GET流式下载 → 7.保存本地MP3。关键：使用CgiGetVkey而非GetEVkey，M500=MP3 128k免费。",
+      "tags": ["download", "song", "mp3", "stream", "vkey"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "get_song_url() in main.py",
+        "entryType": "http",
+        "entities": ["song_mid", "filename=M500...mp3", "purl", "sip", "MP3文件"],
+        "businessRules": [
+          "必须使用CgiGetVkey，不能用GetEVkey(返回104009)",
+          "M500=128kbps MP3 免费，M800=320kbps需VIP",
+          "URL有效期有限，需及时下载",
+          "下载请求需携带User-Agent和Referer"
+        ]
+      }
+    },
+    {
+      "id": "lyric_flow",
+      "type": "flow",
+      "name": "歌词获取流程",
+      "summary": "1.构建GetPlayLyricInfo请求(songMID+songID) → 2.生成sign → 3.POST musics.fcg → 4.从req_1.data.lyric取base64字符串 → 5.base64解码 → 6.得到LRC格式歌词 → 7.保存lyric.lrc。",
+      "tags": ["lyric", "lrc", "base64", "decode"],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "get_lyric() in main.py",
+        "entryType": "http",
+        "entities": ["songMID", "songID", "base64 LRC", "lyric.lrc"]
+      }
+    },
+    {
+      "id": "comment_flow",
+      "type": "flow",
+      "name": "评论翻页采集流程",
+      "summary": "1.构建GetNewCommentList请求(BizType=1,BizId=songID,LastCommentSeqNo游标) → 2.生成sign → 3.POST musics.fcg → 4.解析CommentList → 5.提取Nick/Content/PraiseNum等字段 → 6.检查HasMore → 7.更新LastCommentSeqNo → 8.等待1秒 → 9.循环翻页直到HasMore=0。限速1秒/页防止TCP RST。",
+      "tags": ["comments", "pagination", "cursor", "rate-limit"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "get_comments() in main.py",
+        "entryType": "http",
+        "entities": ["songID", "LastCommentSeqNo", "CommentList", "comments.json"],
+        "businessRules": [
+          "翻页间隔≥1秒防止ConnectionResetError",
+          "服务端可能只返回部分评论(595/1243)",
+          "HasMore=0时终止翻页",
+          "BizType=1表示歌曲评论"
+        ]
+      }
+    },
+    {
+      "id": "report_md",
+      "type": "document",
+      "name": "REPORT.md - 逆向工程完整报告",
+      "filePath": "job/REPORT.md",
+      "summary": "QQ音乐逆向工程完整技术报告，包含项目概述、架构图、API清单、sign机制、AES-GCM加密通道、Cookie刷新、文件清单、复杂度评估等全部内容。",
+      "tags": ["documentation", "report", "architecture"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "request_chain",
+      "type": "document",
+      "name": "请求链路.md - 请求链路分析",
+      "filePath": "DOMTRACE/reverse-records/请求链路.md",
+      "summary": "基于DOMTRACE的请求链路分析文档。记录musics.fcg核心API的Query参数、Body参数、Cookie、响应输出、AES-GCM加密机制、sign生成详情、7个业务API清单。包含交接信息和关键发现。",
+      "tags": ["documentation", "trace", "request-chain", "handoff"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "skills_md",
+      "type": "document",
+      "name": "SKILLS.md - 快速参考手册",
+      "filePath": "job/SKILLS.md",
+      "summary": "QQ音乐API逆向快速参考手册。包含快速开始指南、API入口、sign使用示例、Cookie刷新、g_tk计算、歌曲品质对照表、常见错误码排查。适合接手的逆向工程师快速上手。",
+      "tags": ["documentation", "quickstart", "reference", "cheatsheet"],
+      "complexity": "simple"
+    },
+    {
+      "id": "domtrace_files",
+      "type": "module",
+      "name": "DOMTRACE分析资料",
+      "summary": "DOMTRACE(动态DOM跟踪)目录，包含：Page.chunk.js(页面JS)、vendor.chunk.js(第三方JS，含sign模块)、page.html(页面SSR)、trace_*.ndjson(trace数据)、sign_module_raw.js(原始sign代码提取)。这些是逆向分析过程中收集的核心证据材料。",
+      "tags": ["domtrace", "evidence", "trace", "debugging"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "output_files",
+      "type": "module",
+      "name": "输出产物",
+      "summary": "逆向工程最终输出：lyric.lrc(LRC格式歌词)、comments.json(595条评论，含nick/content/praise_num/time)、爱你_高睿.mp3(M500品质，3.59MB)。验证了完整数据获取链路的可行性。",
+      "tags": ["output", "result", "mp3", "lyric", "comments"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {"source": "main.py", "target": "sign_server.js", "type": "calls", "direction": "forward", "description": "subprocess调用 node sign_server.js --sign body_json", "weight": 0.9},
+    {"source": "sign_server.js", "target": "sign.js", "type": "imports", "direction": "forward", "description": "require('./sign.js') → getSecuritySign", "weight": 1.0},
+    {"source": "sign.js", "target": "env_patches", "type": "depends_on", "direction": "forward", "description": "依赖独立n对象环境补丁", "weight": 0.9},
+    {"source": "sign.js", "target": "jsvmp_vm", "type": "contains", "direction": "forward", "description": "包含完整JSVMP字节码解释器", "weight": 1.0},
+    {"source": "sign_function", "target": "jsvmp_vm", "type": "depends_on", "direction": "forward", "description": "JSVMP VM执行MD5变种哈希", "weight": 0.95},
+    {"source": "api_request", "target": "sign_flow", "type": "contains_flow", "direction": "forward", "description": "api_request内触发sign生成", "weight": 0.8},
+    {"source": "sign_flow", "target": "sign_function", "type": "flow_step", "direction": "forward", "description": "Python→Node.js→getSecuritySign", "weight": 0.85},
+    {"source": "sign_flow", "target": "musics_fcg", "type": "flow_step", "direction": "forward", "description": "sign作为Query参数附加到POST请求", "weight": 0.7},
+    {"source": "musics_fcg", "target": "api_request", "type": "routes", "direction": "forward", "description": "api_request POST到此接口", "weight": 0.9},
+    {"source": "song_download_flow", "target": "cgi_get_vkey", "type": "flow_step", "direction": "forward", "description": "步骤2: 调用CgiGetVkey获取purl", "weight": 0.9},
+    {"source": "song_download_flow", "target": "get_evkey", "type": "related", "direction": "bidirectional", "description": "对比：GetEVkey不可用(104009)，CgiGetVkey可用", "weight": 0.6},
+    {"source": "lyric_flow", "target": "play_lyric", "type": "flow_step", "direction": "forward", "description": "步骤2: 调用GetPlayLyricInfo", "weight": 0.9},
+    {"source": "comment_flow", "target": "comment_list", "type": "flow_step", "direction": "forward", "description": "步骤2: 调用GetNewCommentList翻页", "weight": 0.9},
+    {"source": "cookie_refresh_flow", "target": "qq_login", "type": "flow_step", "direction": "forward", "description": "步骤2: 调用QQLogin接口刷新musickey", "weight": 0.9},
+    {"source": "cookie_refresh_flow", "target": "hash5381", "type": "flow_step", "direction": "forward", "description": "刷新后重新计算g_tk", "weight": 0.8},
+    {"source": "hash5381", "target": "musics_fcg", "type": "depends_on", "direction": "forward", "description": "g_tk作为公共参数comm的一部分传入", "weight": 0.7},
+    {"source": "crypto.js", "target": "jsvmp2_raw.js", "type": "imports", "direction": "forward", "description": "cgiDecrypt依赖第二段JSVMP字节码", "weight": 1.0},
+    {"source": "aes_gcm_channel", "target": "crypto.js", "type": "contains", "direction": "forward", "description": "AES-GCM加密通道实现在crypto.js中", "weight": 0.95},
+    {"source": "aes_gcm_channel", "target": "jsvmp_vm", "type": "depends_on", "direction": "forward", "description": "响应解密使用JSVMP __cgiDecrypt而非标准AES-GCM", "weight": 0.8},
+    {"source": "main.py", "target": "output_files", "type": "writes_to", "direction": "forward", "description": "歌词/评论/歌曲写入本地文件", "weight": 0.7},
+    {"source": "report_md", "target": "sign_flow", "type": "documents", "direction": "forward", "description": "文档记录sign机制", "weight": 0.5},
+    {"source": "report_md", "target": "aes_gcm_channel", "type": "documents", "direction": "forward", "description": "文档记录AES-GCM加密通道", "weight": 0.5},
+    {"source": "request_chain", "target": "musics_fcg", "type": "documents", "direction": "forward", "description": "记录musics.fcg请求链路详情", "weight": 0.5},
+    {"source": "domtrace_files", "target": "sign.js", "type": "depends_on", "direction": "forward", "description": "sign.js从vendor.chunk.js offset:38639提取", "weight": 0.8},
+    {"source": "env_patches", "target": "jsvmp_vm", "type": "configures", "direction": "forward", "description": "环境补丁使JSVMP可在Node.js中运行", "weight": 0.85}
+  ],
+  "layers": [
+    {
+      "id": "layer_python",
+      "name": "Python调度层",
+      "description": "Python请求调度、数据解析、文件保存",
+      "nodeIds": ["main.py", "hash5381", "api_request", "get_lyric", "get_comments", "get_song_url"]
+    },
+    {
+      "id": "layer_nodejs",
+      "name": "Node.js签名层",
+      "description": "JSVMP签名生成、CLI桥接",
+      "nodeIds": ["sign_server.js", "sign.js", "sign_function"]
+    },
+    {
+      "id": "layer_crypto",
+      "name": "加密通道层(备用)",
+      "description": "AES-GCM加密/解密、第二段JSVMP字节码",
+      "nodeIds": ["crypto.js", "jsvmp2_raw.js", "aes_gcm_channel"]
+    },
+    {
+      "id": "layer_api",
+      "name": "API接口层",
+      "description": "QQ音乐后端CGI接口",
+      "nodeIds": ["musics_fcg", "cgi_get_vkey", "get_evkey", "play_lyric", "comment_list", "qq_login"]
+    },
+    {
+      "id": "layer_flows",
+      "name": "业务流程层",
+      "description": "端到端数据获取流程",
+      "nodeIds": ["sign_flow", "song_download_flow", "lyric_flow", "comment_flow", "cookie_refresh_flow"]
+    },
+    {
+      "id": "layer_core",
+      "name": "核心模块层",
+      "description": "JSVMP虚拟机、环境补丁、DOMTRACE证据",
+      "nodeIds": ["jsvmp_vm", "env_patches", "domtrace_files"]
+    },
+    {
+      "id": "layer_docs",
+      "name": "文档与输出层",
+      "description": "技术报告、参考手册、输出产物",
+      "nodeIds": ["report_md", "request_chain", "skills_md", "output_files"]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "🎯 起点：Python调度中心",
+      "description": "main.py是所有数据获取的统一入口。从配置区设置song_mid/song_id/cookie，调用api_request统一发送请求，三个独立流程(get_lyric/get_comments/get_song_url)各司其职。理解main.py就理解了整体数据流。",
+      "nodeIds": ["main.py", "api_request", "hash5381"]
+    },
+    {
+      "order": 2,
+      "title": "🔑 核心难点：JSVMP签名破解",
+      "description": "sign.js包含从vendor.chunk.js提取的JSVMP虚拟机。getSecuritySign(明文body)是访问所有API的钥匙——没有它，所有请求都是废的。理解sign.js的JSVMP字节码解释器和环境补丁是逆向的核心。",
+      "nodeIds": ["sign.js", "sign_server.js", "sign_function", "jsvmp_vm", "env_patches", "sign_flow"]
+    },
+    {
+      "order": 3,
+      "title": "🔐 加密通道：AES-GCM + JSVMP双重加密",
+      "description": "浏览器使用encoding=ag-1加密通道。请求AES-128-GCM加密，响应却用JSVMP自定义密码解密——这种不对称设计是个陷阱。幸好明文通道也能工作，加密通道留作备用。密钥已提取：bd305f10d0ff74b6ef54dab835b5e1cf。",
+      "nodeIds": ["crypto.js", "jsvmp2_raw.js", "aes_gcm_channel"]
+    },
+    {
+      "order": 4,
+      "title": "⚠️ 关键陷阱：双版本Vkey API",
+      "description": "音乐下载最大的坑：新版GetEVkey即使cookie完全有效也返回104009，而经典CgiGetVkey稳定正常。不读DOMTRACE数据很难发现这个差异。CgiGetVkey需要filename参数(M500{songmid}.mp3)，免费品质128kbps。",
+      "nodeIds": ["cgi_get_vkey", "get_evkey", "song_download_flow"]
+    },
+    {
+      "order": 5,
+      "title": "📊 数据流：歌词+评论+歌曲三合一",
+      "description": "三个独立数据流：歌词(base64 LRC解码)、评论(游标翻页采集，1秒间隔防限流)、歌曲(URL获取+流式下载)。所有请求共享同一个musics.fcg入口和sign签名机制。",
+      "nodeIds": ["lyric_flow", "comment_flow", "song_download_flow", "play_lyric", "comment_list", "musics_fcg"]
+    },
+    {
+      "order": 6,
+      "title": "🔄 持久化：Cookie自动刷新",
+      "description": "musickey每3天过期，但access_token有效期60天。通过QQLogin接口用token换新musickey，无需浏览器登录。更换后记得重新计算g_tk = hash5381(新musickey)。60天窗口内可无限刷新。",
+      "nodeIds": ["cookie_refresh_flow", "qq_login", "hash5381"]
+    }
+  ]
+}

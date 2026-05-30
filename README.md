@@ -15,17 +15,17 @@ Web API 签名逆向分析项目合集，包含 JSVMP 签名破解、RS6 瑞数�
 
 ```
 ai_reverse_study/
-├── README.md
+├── README.md / 环境配置.md / requirements.txt
 ├── qq_music/
-│   ├── 逆向流程说明.md                 # QQ音乐详细逆向流程
-│   ├── code/
-│   └── understand-anything/
+│   ├── 逆向流程说明.md
+│   ├── reverse_code/                   # 逆向代码
+│   └── understand-anything/            # 知识图谱
 └── qikan/
-    ├── 逆向流程说明.md                 # 维普期刊详细逆向流程
-    ├── code/
-    ├── data/
-    ├── init/
-    └── understand-anything/
+    ├── 逆向流程说明.md
+    ├── reverse_code/                   # 逆向代码
+    │   ├── data/                       # 爬取结果
+    │   └── init/                       # 任务规格书
+    └── understand-anything/            # 知识图谱
 ```
 
 ## 📋 项目索引
@@ -36,11 +36,11 @@ ai_reverse_study/
 |------|------|
 | **逆向流程说明** | [qq_music/逆向流程说明.md](qq_music/逆向流程说明.md) |
 | 知识图谱 | [在线查看](https://qihe-no-study.github.io/ai_reverse_study/qq_music/understand-anything/) |
-| 技术报告 | [REPORT.md](qq_music/code/REPORT.md) |
-| 请求链路 | [请求链路.md](qq_music/code/请求链路.md) |
-| 快速参考 | [SKILLS.md](qq_music/code/SKILLS.md) |
-| Sign 实现 | [sign.js](qq_music/code/sign.js) |
-| Python 入口 | [main.py](qq_music/code/main.py) |
+| 技术报告 | [REPORT.md](qq_music/reverse_code/REPORT.md) |
+| 请求链路 | [请求链路.md](qq_music/reverse_code/请求链路.md) |
+| 快速参考 | [SKILLS.md](qq_music/reverse_code/SKILLS.md) |
+| Sign 实现 | [sign.js](qq_music/reverse_code/sign.js) |
+| Python 入口 | [main.py](qq_music/reverse_code/main.py) |
 
 ### 维普期刊
 
@@ -48,10 +48,10 @@ ai_reverse_study/
 |------|------|
 | **逆向流程说明** | [qikan/逆向流程说明.md](qikan/逆向流程说明.md) |
 | 知识图谱 | [在线查看](https://qihe-no-study.github.io/ai_reverse_study/qikan/understand-anything/) |
-| 任务规格书 | [task_cqvip_journal_guid.md](qikan/init/task_cqvip_journal_guid.md) |
-| Python 入口 | [fetch_page.py](qikan/code/fetch_page.py) |
-| sdenv 核心 | [sdenv_rs6.js](qikan/code/sdenv_rs6.js) |
-| 爬取结果 | [journal_guid.html](qikan/data/journal_guid.html) |
+| 任务规格书 | [task_cqvip_journal_guid.md](qikan/reverse_code/init/task_cqvip_journal_guid.md) |
+| Python 入口 | [fetch_page.py](qikan/reverse_code/fetch_page.py) |
+| sdenv 核心 | [sdenv_rs6.js](qikan/reverse_code/sdenv_rs6.js) |
+| 爬取结果 | [journal_guid.html](qikan/reverse_code/data/journal_guid.html) |
 
 ## 📦 环境要求
 
@@ -69,10 +69,10 @@ git clone git@github.com:qihe-no-study/ai_reverse_study.git
 cd ai_reverse_study
 
 # QQ音乐
-cd qq_music/code && pip install requests && python main.py
+cd qq_music/reverse_code && pip install requests && python main.py
 
 # 维普期刊
-cd qikan/code && pnpm install && python fetch_page.py
+cd qikan/reverse_code && pnpm install && python fetch_page.py
 ```
 
 ## 🛠️ 相关工具
