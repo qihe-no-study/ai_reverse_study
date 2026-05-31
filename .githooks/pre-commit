@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * pre-commit 钩子：确保所有项目子目录结构一致
+ * pre-commit 钩子：确保代码目录结构统一（以 qikan/reverse_code 为基准）
  *
- * 标准结构（以 qikan 为基准）:
- *   <项目>/
+ * 标准结构:
+ *   <代码目录>/
  *   ├── .gitignore      (data/)
- *   ├── env/             (环境配置: .npmrc / package.json / lock)
- *   ├── fetch/           (抓取入口脚本)
+ *   ├── env/             (环境配置)
+ *   ├── fetch/           (抓取入口)
  *   ├── code/            (辅助代码)
  *   ├── prompt/          (任务规格书)
- *   └── data/            (产出数据 — gitignore)
+ *   └── data/            (产出 — gitignore)
+ *
+ * 安装: git config core.hooksPath .githooks
  */
 
 const fs = require('fs');
@@ -17,18 +19,41 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const REPO_ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
-const EXCLUDE = new Set(['.git', '.githooks', 'node_modules', 'understand-anything', '.claude']);
 
 const STRUCTURE = ['env', 'fetch', 'code', 'prompt', 'data'];
-const GITIGNORE_CONTENT = 'data/\n';
+const GITIGNORE = 'data/\n';
 
-// 文件归类
+function isCodeDir(dir) {
+  if (!fs.statSync(dir).isDirectory()) return false;
+  // 目录必须包含可识别的代码文件 或 已有标准结构
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const names = entries.map(e => e.name);
+  if (STRUCTURE.some(d => names.includes(d))) return true; // 已有标准结构
+  return entries.some(e => e.isFile() && /\.(py|js|ts|md|json)$/.test(e.name));
+}
+
+function walk(dir, depth) {
+  if (depth > 3) return [];
+  if (!fs.existsSync(dir)) return [];
+  const results = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    if (['.git', '.githooks', 'node_modules', 'understand-anything', '__pycache__', '.pnpm'].includes(e.name)) continue;
+    const full = path.join(dir, e.name);
+    if (isCodeDir(full)) {
+      results.push(full);
+    } else {
+      results.push(...walk(full, depth + 1));
+    }
+  }
+  return results;
+}
+
 function classify(name) {
   const ext = path.extname(name);
-  const base = path.basename(name);
   if (name === '.gitignore' || name === '.npmrc') return null;
-  if (name === 'package.json' || name === 'pnpm-lock.yaml' || name.endsWith('.lock')) return 'env';
-  if (name === '环境配置.md' || name.includes('env')) return 'env';
+  if (name === 'package.json' || name === 'pnpm-lock.yaml') return 'env';
   if (ext === '.py') return 'fetch';
   if (ext === '.js' || ext === '.ts' || ext === '.cjs' || ext === '.mjs') return 'code';
   if (ext === '.md') return 'prompt';
@@ -37,48 +62,8 @@ function classify(name) {
   return null;
 }
 
-// 检测是否已有标准结构
-function hasStructure(dir) {
-  return STRUCTURE.every(d => fs.existsSync(path.join(dir, d)));
-}
-
-// 找到项目目录（第一级子目录，且不包含标准结构的视为项目根）
-function findProjects(root) {
-  const projects = [];
-  const entries = fs.readdirSync(root, { withFileTypes: true });
-  for (const e of entries) {
-    if (!e.isDirectory() || EXCLUDE.has(e.name)) continue;
-    const p = path.join(root, e.name);
-    // 检查是否是项目目录：有标准子目录 或 有源代码文件
-    if (hasStructure(p)) {
-      projects.push(p);
-    } else {
-      // 递归再往下一级
-      const sub = fs.readdirSync(p, { withFileTypes: true });
-      const hasStd = sub.some(s => STRUCTURE.includes(s.name));
-      const hasCode = sub.some(s => s.isFile() && /\.(py|js|ts|md|json)$/.test(s.name));
-      if (hasStd || hasCode) {
-        projects.push(p);
-      } else {
-        // 再下一级（如 qikan/reverse_code）
-        for (const s of sub) {
-          if (s.isDirectory() && !EXCLUDE.has(s.name)) {
-            const pp = path.join(p, s.name);
-            const ss = fs.readdirSync(pp, { withFileTypes: true });
-            if (ss.some(x => STRUCTURE.includes(x.name)) || ss.some(x => x.isFile())) {
-              projects.push(pp);
-            }
-          }
-        }
-      }
-    }
-  }
-  return projects;
-}
-
+const projects = walk(REPO_ROOT, 0);
 let fixed = false;
-
-const projects = findProjects(REPO_ROOT);
 
 projects.forEach(proj => {
   const rel = path.relative(REPO_ROOT, proj);
@@ -93,32 +78,31 @@ projects.forEach(proj => {
     }
   });
 
-  // 确保 .gitignore 存在且内容正确
+  // 确保 .gitignore 正确
   const gi = path.join(proj, '.gitignore');
-  if (!fs.existsSync(gi) || fs.readFileSync(gi, 'utf-8').trim() !== GITIGNORE_CONTENT.trim()) {
-    fs.writeFileSync(gi, GITIGNORE_CONTENT);
-    execSync(`git add "${path.relative(REPO_ROOT, gi)}"`);
+  if (!fs.existsSync(gi) || fs.readFileSync(gi, 'utf-8').trim() !== GITIGNORE.trim()) {
+    fs.writeFileSync(gi, GITIGNORE);
+    execSync(`git add "${path.relative(REPO_ROOT, gi).replace(/\\/g, '/')}"`);
     console.log(`[pre-commit] ✓ ${rel}/.gitignore`);
     fixed = true;
   }
 
-  // 归位放错位置的文件
-  const rootFiles = fs.readdirSync(proj, { withFileTypes: true }).filter(e => e.isFile());
-  rootFiles.forEach(f => {
-    const destDir = classify(f.name);
-    if (!destDir) return;
-    const src = path.join(proj, f.name);
-    const dest = path.join(proj, destDir, f.name);
-    if (fs.existsSync(dest)) return;
+  // 归位根目录散落的文件
+  fs.readdirSync(proj, { withFileTypes: true })
+    .filter(e => e.isFile())
+    .forEach(f => {
+      const destDir = classify(f.name);
+      if (!destDir) return;
+      const src = path.join(proj, f.name);
+      const dest = path.join(proj, destDir, f.name);
+      if (fs.existsSync(dest)) return;
 
-    fs.renameSync(src, dest);
-    try { execSync(`git rm --cached "${path.relative(REPO_ROOT, src).replace(/\\/g, '/')}" 2>/dev/null`); } catch (_) {}
-    execSync(`git add "${path.relative(REPO_ROOT, dest).replace(/\\/g, '/')}"`);
-    console.log(`[pre-commit] → ${rel}/${f.name} → ${destDir}/`);
-    fixed = true;
-  });
+      fs.renameSync(src, dest);
+      try { execSync(`git rm --cached "${path.relative(REPO_ROOT, src).replace(/\\/g, '/')}" 2>/dev/null`); } catch (_) {}
+      execSync(`git add "${path.relative(REPO_ROOT, dest).replace(/\\/g, '/')}"`);
+      console.log(`[pre-commit] → ${rel}/${f.name} → ${destDir}/`);
+      fixed = true;
+    });
 });
 
-if (fixed) {
-  console.log('[pre-commit] ✅ 结构已自动调整');
-}
+if (fixed) console.log('[pre-commit] ✅ 目录结构已自动调整');
