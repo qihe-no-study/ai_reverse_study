@@ -4,7 +4,7 @@ qikan.cqvip.com 页面采集 — Python 集成 sdenv
 """
 import subprocess, sys, os
 
-NODE_SCRIPT = os.path.join(os.path.dirname(__file__), "sdenv_rs6.js")
+NODE_SCRIPT = os.path.join(os.path.dirname(__file__), "..", "code", "sdenv_rs6.js")
 
 
 def get_cookies() -> dict:

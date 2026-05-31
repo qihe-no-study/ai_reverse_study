@@ -50,7 +50,7 @@ ai_reverse_study/
 | 知识图谱 | [在线查看](https://qihe-no-study.github.io/ai_reverse_study/qikan/understand-anything/) |
 | 任务规格书 | [task_cqvip_journal_guid.md](qikan/reverse_code/prompt/task_cqvip_journal_guid.md) |
 | Python 入口 | [fetch_page.py](qikan/reverse_code/fetch/fetch_page.py) |
-| sdenv 核心 | [sdenv_rs6.js](qikan/reverse_code/fetch/sdenv_rs6.js) |
+| sdenv 核心 | [sdenv_rs6.js](qikan/reverse_code/code/sdenv_rs6.js) |
 | 爬取结果 | [journal_guid.html](qikan/reverse_code/data/journal_guid.html) |
 
 ## 📦 环境要求
