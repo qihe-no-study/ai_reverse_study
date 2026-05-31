@@ -72,7 +72,7 @@ cd ai_reverse_study
 cd qq_music/reverse_code && pip install requests && python main.py
 
 # 维普期刊
-cd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.py
+cd qikan/reverse_code cd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.pycd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.py pnpm install cd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.pycd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.py cd fetch cd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.pycd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.py python fetch_page.py
 ```
 
 ## 🛠️ 相关工具
