@@ -21,17 +21,17 @@ SONG_ID = 491514351
 ALBUM_MID = "0035DC6W4ZpSqf"
 UIN = 854594834
 GUID = "5274311692"
-MUSICKEY = "Q_H_L_63k3NkXdh_nR_cM_p-Zn8FGPZ_xscLstaFOPMZkU7ihNS4UQBUGrGJfKI1K4hSngSlEyl51vVp6AZhDfUKuEzVIQG"
+MUSICKEY = "Q_H_L_63k3NaRKwJb5nFXGEv14zeU3Ns3y5rEnoeTgBsdIJPptEpJAfFa5f3_DxMpb6Wh91QW6r-_0Ol"
 
 COOKIES = {
     "uin": str(UIN),
     "qm_keyst": MUSICKEY,
     "qqmusic_key": MUSICKEY,
     "psrf_qqopenid": "93EBC565433E41E3D6E50F3B8F71F0A4",
-    "psrf_qqaccess_token": "7A28DEA7DE8554A8916AC508269BB147",
-    "psrf_qqrefresh_token": "0F95DE8A0ABDC42033A7799AF79DC4DF",
+    "psrf_qqaccess_token": "82732879A40E347BE2D81345F1060E07",
+    "psrf_qqrefresh_token": "D0832428C628CB8B43107002399528F4",
     "tmeLoginType": "2",
-    "psrf_musickey_createtime": "1778071205",
+    "psrf_musickey_createtime": "1780207672",
     "login_type": "1",
     "euin": "Ne4P7KEPNeoP",
     "psrf_qqunionid": "25B8637202A424F8AFFB199FA46FFA70",
