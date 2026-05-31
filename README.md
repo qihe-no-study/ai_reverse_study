@@ -39,8 +39,8 @@ ai_reverse_study/
 | 技术报告 | [REPORT.md](qq_music/reverse_code/REPORT.md) |
 | 请求链路 | [请求链路.md](qq_music/reverse_code/请求链路.md) |
 | 快速参考 | [SKILLS.md](qq_music/reverse_code/SKILLS.md) |
-| Sign 实现 | [sign.js](qq_music/reverse_code/sign.js) |
-| Python 入口 | [main.py](qq_music/reverse_code/main.py) |
+| Sign 实现 | [sign.js](qq_music/reverse_code/code/sign.js) |
+| Python 入口 | [main.py](qq_music/reverse_code/fetch/main.py) |
 
 ### 维普期刊
 

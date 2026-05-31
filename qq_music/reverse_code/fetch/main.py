@@ -44,7 +44,8 @@ HEADERS = {
 }
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = SCRIPT_DIR
+ROOT_DIR = os.path.join(SCRIPT_DIR, "..")
+OUTPUT_DIR = os.path.join(ROOT_DIR, "data")
 
 
 def hash5381(s: str) -> int:
@@ -58,7 +59,7 @@ G_TK = hash5381(MUSICKEY)
 
 
 def get_sign(data_str: str) -> str:
-    sign_script = os.path.join(SCRIPT_DIR, "sign_server.js")
+    sign_script = os.path.join(ROOT_DIR, "code", "sign_server.js")
     result = subprocess.run(
         ["node", sign_script, "--sign", data_str],
         capture_output=True, text=True, timeout=10
