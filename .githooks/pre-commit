@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+/**
+ * pre-commit 钩子：确保所有项目子目录结构一致
+ *
+ * 标准结构（以 qikan 为基准）:
+ *   <项目>/
+ *   ├── .gitignore      (data/)
+ *   ├── env/             (环境配置: .npmrc / package.json / lock)
+ *   ├── fetch/           (抓取入口脚本)
+ *   ├── code/            (辅助代码)
+ *   ├── prompt/          (任务规格书)
+ *   └── data/            (产出数据 — gitignore)
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const REPO_ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+const EXCLUDE = new Set(['.git', '.githooks', 'node_modules', 'understand-anything', '.claude']);
+
+const STRUCTURE = ['env', 'fetch', 'code', 'prompt', 'data'];
+const GITIGNORE_CONTENT = 'data/\n';
+
+// 文件归类
+function classify(name) {
+  const ext = path.extname(name);
+  const base = path.basename(name);
+  if (name === '.gitignore' || name === '.npmrc') return null;
+  if (name === 'package.json' || name === 'pnpm-lock.yaml' || name.endsWith('.lock')) return 'env';
+  if (name === '环境配置.md' || name.includes('env')) return 'env';
+  if (ext === '.py') return 'fetch';
+  if (ext === '.js' || ext === '.ts' || ext === '.cjs' || ext === '.mjs') return 'code';
+  if (ext === '.md') return 'prompt';
+  if (ext === '.html' || ext === '.csv' || ext === '.txt') return 'data';
+  if (ext === '.json') return 'env';
+  return null;
+}
+
+// 检测是否已有标准结构
+function hasStructure(dir) {
+  return STRUCTURE.every(d => fs.existsSync(path.join(dir, d)));
+}
+
+// 找到项目目录（第一级子目录，且不包含标准结构的视为项目根）
+function findProjects(root) {
+  const projects = [];
+  const entries = fs.readdirSync(root, { withFileTypes: true });
+  for (const e of entries) {
+    if (!e.isDirectory() || EXCLUDE.has(e.name)) continue;
+    const p = path.join(root, e.name);
+    // 检查是否是项目目录：有标准子目录 或 有源代码文件
+    if (hasStructure(p)) {
+      projects.push(p);
+    } else {
+      // 递归再往下一级
+      const sub = fs.readdirSync(p, { withFileTypes: true });
+      const hasStd = sub.some(s => STRUCTURE.includes(s.name));
+      const hasCode = sub.some(s => s.isFile() && /\.(py|js|ts|md|json)$/.test(s.name));
+      if (hasStd || hasCode) {
+        projects.push(p);
+      } else {
+        // 再下一级（如 qikan/reverse_code）
+        for (const s of sub) {
+          if (s.isDirectory() && !EXCLUDE.has(s.name)) {
+            const pp = path.join(p, s.name);
+            const ss = fs.readdirSync(pp, { withFileTypes: true });
+            if (ss.some(x => STRUCTURE.includes(x.name)) || ss.some(x => x.isFile())) {
+              projects.push(pp);
+            }
+          }
+        }
+      }
+    }
+  }
+  return projects;
+}
+
+let fixed = false;
+
+const projects = findProjects(REPO_ROOT);
+
+projects.forEach(proj => {
+  const rel = path.relative(REPO_ROOT, proj);
+
+  // 确保标准子目录存在
+  STRUCTURE.forEach(d => {
+    const dp = path.join(proj, d);
+    if (!fs.existsSync(dp)) {
+      fs.mkdirSync(dp, { recursive: true });
+      console.log(`[pre-commit] ✓ ${rel}/${d}/`);
+      fixed = true;
+    }
+  });
+
+  // 确保 .gitignore 存在且内容正确
+  const gi = path.join(proj, '.gitignore');
+  if (!fs.existsSync(gi) || fs.readFileSync(gi, 'utf-8').trim() !== GITIGNORE_CONTENT.trim()) {
+    fs.writeFileSync(gi, GITIGNORE_CONTENT);
+    execSync(`git add "${path.relative(REPO_ROOT, gi)}"`);
+    console.log(`[pre-commit] ✓ ${rel}/.gitignore`);
+    fixed = true;
+  }
+
+  // 归位放错位置的文件
+  const rootFiles = fs.readdirSync(proj, { withFileTypes: true }).filter(e => e.isFile());
+  rootFiles.forEach(f => {
+    const destDir = classify(f.name);
+    if (!destDir) return;
+    const src = path.join(proj, f.name);
+    const dest = path.join(proj, destDir, f.name);
+    if (fs.existsSync(dest)) return;
+
+    fs.renameSync(src, dest);
+    try { execSync(`git rm --cached "${path.relative(REPO_ROOT, src).replace(/\\/g, '/')}" 2>/dev/null`); } catch (_) {}
+    execSync(`git add "${path.relative(REPO_ROOT, dest).replace(/\\/g, '/')}"`);
+    console.log(`[pre-commit] → ${rel}/${f.name} → ${destDir}/`);
+    fixed = true;
+  });
+});
+
+if (fixed) {
+  console.log('[pre-commit] ✅ 结构已自动调整');
+}
