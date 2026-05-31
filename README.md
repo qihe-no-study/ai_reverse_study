@@ -48,9 +48,9 @@ ai_reverse_study/
 |------|------|
 | **逆向流程说明** | [qikan/逆向流程说明.md](qikan/逆向流程说明.md) |
 | 知识图谱 | [在线查看](https://qihe-no-study.github.io/ai_reverse_study/qikan/understand-anything/) |
-| 任务规格书 | [task_cqvip_journal_guid.md](qikan/reverse_code/init/task_cqvip_journal_guid.md) |
-| Python 入口 | [fetch_page.py](qikan/reverse_code/fetch_page.py) |
-| sdenv 核心 | [sdenv_rs6.js](qikan/reverse_code/sdenv_rs6.js) |
+| 任务规格书 | [task_cqvip_journal_guid.md](qikan/reverse_code/prompt/task_cqvip_journal_guid.md) |
+| Python 入口 | [fetch_page.py](qikan/reverse_code/fetch/fetch_page.py) |
+| sdenv 核心 | [sdenv_rs6.js](qikan/reverse_code/fetch/sdenv_rs6.js) |
 | 爬取结果 | [journal_guid.html](qikan/reverse_code/data/journal_guid.html) |
 
 ## 📦 环境要求
@@ -72,7 +72,7 @@ cd ai_reverse_study
 cd qq_music/reverse_code && pip install requests && python main.py
 
 # 维普期刊
-cd qikan/reverse_code && pnpm install && python fetch_page.py
+cd qikan/reverse_code/fetch && pnpm install ../ && python fetch_page.py
 ```
 
 ## 🛠️ 相关工具

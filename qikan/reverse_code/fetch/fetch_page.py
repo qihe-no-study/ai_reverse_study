@@ -62,7 +62,7 @@ def main():
     cookies = get_cookies()
 
     # 保存 Cookie
-    with open(os.path.join(os.path.dirname(__file__), "web_config", "cookies.txt"), "w") as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "code", "web_config", "cookies.txt"), "w") as f:
         f.write(cookies)
     print("[Python] Cookie 已保存到 web_config/cookies.txt")
 
