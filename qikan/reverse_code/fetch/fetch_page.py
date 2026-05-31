@@ -4,16 +4,22 @@ qikan.cqvip.com 页面采集 — Python 集成 sdenv
 """
 import subprocess, sys, os
 
-NODE_SCRIPT = os.path.join(os.path.dirname(__file__), "..", "code", "sdenv_rs6.js")
+SCRIPT_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.join(SCRIPT_DIR, "..")
+NODE_SCRIPT = os.path.join(ROOT_DIR, "code", "sdenv_rs6.js")
+NODE_MODULES = os.path.join(ROOT_DIR, "env", "node_modules")
 
 
 def get_cookies() -> dict:
     """调用 Node.js sdenv 获取 Cookie，返回解析后的 dict"""
     print("[Python] 调用 sdenv 生成 Cookie...")
+    env = os.environ.copy()
+    env["NODE_PATH"] = NODE_MODULES
+
     result = subprocess.run(
         ["node", NODE_SCRIPT],
         capture_output=True, text=True, timeout=60,
-        cwd=os.path.dirname(__file__),
+        cwd=ROOT_DIR, env=env,
     )
     raw = result.stdout.strip()
     if not raw or "ERROR" in raw:
